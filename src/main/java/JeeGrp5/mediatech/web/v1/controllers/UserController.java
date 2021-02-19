@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
 
+import javax.servlet.http.HttpSession;
+
 @Controller("/users")
 public class UserController {
     private final UserRepository userRepository;
@@ -27,13 +29,14 @@ public class UserController {
             method = RequestMethod.POST,
             produces = "application/json")
     @ResponseBody
-    public UserGetDto login(@RequestBody UserLoginDto userLoginDto) {
+    public UserGetDto login(HttpSession session, @RequestBody UserLoginDto userLoginDto) {
         User user = userRepository.findByLogin(userLoginDto.getLogin());
 
         if (!user.getPassword().equals(userLoginDto.getPassword())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Wrong login or password");
         }
 
+        session.setAttribute("user", user);
         return new UserGetDto(user.getFirstname(), user.getLastname(), user.getLogin(), user.getProfile());
     }
 }
