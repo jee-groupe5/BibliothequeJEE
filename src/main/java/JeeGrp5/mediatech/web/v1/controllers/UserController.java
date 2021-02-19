@@ -4,8 +4,6 @@ import JeeGrp5.mediatech.entities.User;
 import JeeGrp5.mediatech.repositories.UserRepository;
 import JeeGrp5.mediatech.web.v1.dtos.UserGetDto;
 import JeeGrp5.mediatech.web.v1.dtos.UserLoginDto;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,6 +20,21 @@ public class UserController {
 
     public UserController(UserRepository userRepository) {
         this.userRepository = userRepository;
+    }
+
+    /**
+     * Returns current user's information
+     * @param session User's session
+     * @return User's information
+     */
+    @RequestMapping(
+            value = "/users/information",
+            method = RequestMethod.GET,
+            produces = "application/json")
+    @ResponseBody
+    public UserGetDto login(HttpSession session) {
+        User user = (User) session.getAttribute("user");
+        return new UserGetDto(user.getFirstname(), user.getLastname(), user.getLogin(), user.getProfile());
     }
 
     @RequestMapping(
