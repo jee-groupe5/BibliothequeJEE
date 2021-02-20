@@ -1,5 +1,7 @@
 package JeeGrp5.mediatech.web.v1.dtos;
 
+import java.util.Objects;
+
 public class UserGetDto {
     private String firstname;
     private String lastname;
@@ -46,5 +48,18 @@ public class UserGetDto {
 
     public void setProfile(String profile) {
         this.profile = profile;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof UserGetDto)) return false;
+        UserGetDto that = (UserGetDto) o;
+        return firstname.equals(that.firstname) && lastname.equals(that.lastname) && login.equals(that.login) && profile.equals(that.profile);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(firstname, lastname, login, profile);
     }
 }

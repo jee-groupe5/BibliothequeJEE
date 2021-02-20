@@ -16,6 +16,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
+import javax.servlet.http.Cookie;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 class UserControllerTest {
@@ -53,15 +55,17 @@ class UserControllerTest {
         );
 
         UserLoginDto userCredentials = new UserLoginDto("oualid.hassan.pro@gmail.com", "123456");
-        this.mockMvc.perform(post("/users/login")
-                .contentType("application/json")
-                .content(objectMapper.writeValueAsString(userCredentials)))
-                .andDo(print())
+        Cookie[] cookies = this.mockMvc.perform(
+                post("/users/login")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(userCredentials)))
                 .andExpect(status().isOk())
-                .andExpect(content().json(objectMapper.writeValueAsString(userGetDto)));
+                .andExpect(content().json(objectMapper.writeValueAsString(userGetDto)))
+                .andReturn().getResponse().getCookies();
 
-        this.mockMvc.perform(get("/users/information"))
-                .andDo(print())
+        this.mockMvc.perform(
+                get("/users/information")
+                        .cookie(cookies))
                 .andExpect(status().isOk())
                 .andExpect(content().json(objectMapper.writeValueAsString(userGetDto)));
     }
