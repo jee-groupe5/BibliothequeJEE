@@ -1,8 +1,10 @@
 package JeeGrp5.mediatech.entities;
 
+import org.springframework.data.mongodb.core.mapping.Document;
+
+@Document(collection = "persons")
 public class Person {
     private String fullname;
-    private boolean authorization;
 
     public Person() {
     }
@@ -15,19 +17,10 @@ public class Person {
         this.fullname = fullname;
     }
 
-    public boolean isAuthorization() {
-        return authorization;
-    }
-
-    public void setAuthorization(boolean authorization) {
-        this.authorization = authorization;
-    }
-
     @Override
     public String toString() {
         return "Person{" +
                 "fullname='" + fullname + '\'' +
-                ", authorization=" + authorization +
                 '}';
     }
 }

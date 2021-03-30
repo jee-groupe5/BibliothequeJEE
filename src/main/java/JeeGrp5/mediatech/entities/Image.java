@@ -13,14 +13,23 @@ public class Image implements Serializable {
     @Id
     private String id;
 
+    private String category;
     private String name;
-    private String description;
-    private Map<String, String> urls;
-    private String[] tags;
-    private boolean published;
     private Person[] persons;
+    private boolean published;
+    private String description;
+    private String[] tags;
+    private Map<String, String> urls;
 
     public Image() {
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
     }
 
     public String getId() {
