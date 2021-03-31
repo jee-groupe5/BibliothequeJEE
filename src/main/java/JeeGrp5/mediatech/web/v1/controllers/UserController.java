@@ -52,4 +52,21 @@ public class UserController {
         session.setAttribute("user", user);
         return new UserGetDto(user.getFirstname(), user.getLastname(), user.getLogin(), user.getProfile());
     }
+
+    @RequestMapping(
+            value = "/new/user",
+            method = RequestMethod.GET,
+            produces = "application/json")
+    @ResponseBody
+    public void login() {
+        User user = new User();
+        user.setFirstname("test");
+        user.setLastname("dummy");
+        user.setLogin("dummy.test@test.com");
+        user.setPassword("123456");
+        user.setProfile("Gestionnaire");
+
+        userRepository.insert(user);
+
+    }
 }
