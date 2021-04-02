@@ -19,7 +19,7 @@ public class ImageService {
     private final ObjectDetector objectDetector;
     private final ImageWatermark imageWatermark;
 
-    public ImageService() throws IOException {
+    public ImageService() {
         this.objectDetector = new ObjectDetector();
         this.imageWatermark = new ImageWatermark();
     }

@@ -96,21 +96,23 @@ public class ImageController {
     public ImageUploadDto upload(@RequestParam("file") MultipartFile sourceImage) {
         Image image = new Image();
 
+        // Generate an id
+        imageRepository.save(image);
+
         String hdPath = folderPath + "/" + image.getId() + "/" + sourceImage.getOriginalFilename();
 
         HashMap<String, String> hashMap = new HashMap<>();
         hashMap.put("hd", hdPath);
         image.setUrls(hashMap);
 
-        imageRepository.save(image);
-
         File file = new File(hdPath);
 
         try {
             FileUtils.copyInputStreamToFile(sourceImage.getInputStream(), file);
             Classifications classifications = this.imageService.detectObjects(file.getAbsolutePath());
-//            this.imageService.addWatermark(file.getAbsolutePath());
+            this.imageService.addWatermark(file.getAbsolutePath());
 
+            imageRepository.save(image);
             return new ImageUploadDto(classifications.items().toArray(new Classification[0]), new HashMap<>());
         } catch (Exception e) {
             imageRepository.delete(image);
