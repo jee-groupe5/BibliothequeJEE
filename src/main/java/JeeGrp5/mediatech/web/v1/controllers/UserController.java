@@ -4,6 +4,7 @@ import JeeGrp5.mediatech.entities.User;
 import JeeGrp5.mediatech.repositories.UserRepository;
 import JeeGrp5.mediatech.web.v1.dtos.UserGetDto;
 import JeeGrp5.mediatech.web.v1.dtos.UserLoginDto;
+import org.json.JSONException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -11,6 +12,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.server.ResponseStatusException;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import javax.servlet.http.HttpSession;
 
@@ -55,16 +58,28 @@ public class UserController {
 
     @RequestMapping(
             value = "/new/user",
-            method = RequestMethod.GET,
+            method = RequestMethod.PUT,
+            consumes = "application/json",
             produces = "application/json")
     @ResponseBody
-    public void login() {
+    public void login(@RequestBody String response) throws JSONException {
+
+        JSONArray array = new JSONArray(response);
+        JSONObject object = array.getJSONObject(0);
+
         User user = new User();
-        user.setFirstname("test");
-        user.setLastname("dummy");
-        user.setLogin("dummy.test@test.com");
-        user.setPassword("123456");
-        user.setProfile("Gestionnaire");
+        user.setFirstname(object.getString("firstname"));
+        user.setLastname(object.getString("lastname"));
+        user.setLogin(object.getString("login"));
+        user.setPassword(object.getString("password"));
+        user.setProfile(object.getString("profile"));
+
+        try {
+            User verification = userRepository.findByLogin(user.getLogin());
+        }
+        catch (Error error){
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "The login is already used");
+        }
 
         userRepository.insert(user);
 
