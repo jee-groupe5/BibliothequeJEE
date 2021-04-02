@@ -43,12 +43,8 @@ public class ObjectDetector {
     public ObjectDetector() {
     }
 
-    public Classifications detectObjects(String path) throws IOException, ModelException, TranslateException {
-        if (!"TensorFlow".equals(Engine.getInstance().getEngineName())) {
-            return null;
-        }
-
-        Path imageFile = Paths.get("D:\\Wawa\\Téléchargements\\photo-1526265218618-bdbe4fdb5360.jfif");
+    public Classifications detectObjects(String path, float threshold) throws IOException, ModelException, TranslateException {
+        Path imageFile = Paths.get(path);
         Image img = ImageFactory.getInstance().fromFile(imageFile);
 
         String modelUrl =
@@ -61,7 +57,7 @@ public class ObjectDetector {
                         .optModelUrls(modelUrl)
                         // saved_model.pb file is in the subfolder of the model archive file
                         .optModelName("ssd_mobilenet_v2_320x320_coco17_tpu-8/saved_model")
-                        .optTranslator(new MyTranslator())
+                        .optTranslator(new MyTranslator(threshold))
                         .optProgress(new ProgressBar())
                         .build();
 
@@ -81,11 +77,10 @@ public class ObjectDetector {
     private static final class MyTranslator implements Translator<Image, Classifications> {
         private Map<Integer, String> classes;
 
-        @Value("${mediatech.ai.threshold}")
-        private float threshold;
+        private final float threshold;
 
-        public MyTranslator() {
-
+        public MyTranslator(float threshold) {
+            this.threshold = threshold;
         }
 
         @Override
