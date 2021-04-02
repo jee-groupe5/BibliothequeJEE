@@ -26,6 +26,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
@@ -99,10 +100,14 @@ public class ImageController {
         // Generate an id
         imageRepository.save(image);
 
-        String hdPath = folderPath + "/" + image.getId() + "/" + sourceImage.getOriginalFilename();
+        String hdPath = Path.of(
+                folderPath + "/" +
+                        image.getId() + "/" +
+                        sourceImage.getOriginalFilename()
+        ).toString();
 
         HashMap<String, String> hashMap = new HashMap<>();
-        hashMap.put("hd", hdPath);
+        hashMap.put("hd", "file:///" + hdPath);
         image.setUrls(hashMap);
 
         File file = new File(hdPath);
@@ -113,7 +118,7 @@ public class ImageController {
             this.imageService.addWatermark(file.getAbsolutePath());
 
             imageRepository.save(image);
-            return new ImageUploadDto(classifications.items().toArray(new Classification[0]), new HashMap<>());
+            return new ImageUploadDto(classifications.items().toArray(new Classification[0]), image.getId());
         } catch (Exception e) {
             imageRepository.delete(image);
 
