@@ -5,22 +5,22 @@ import ai.djl.modality.Classifications.Classification;
 import java.util.Arrays;
 
 public class ImageUploadDto {
-    private Classification[] objects;
+    private String[] objects;
     private String id;
 
     public ImageUploadDto() {
     }
 
-    public ImageUploadDto(Classification[] objects, String id) {
+    public ImageUploadDto(String[] objects, String id) {
         this.objects = objects;
         this.id = id;
     }
 
-    public Classification[] getObjects() {
+    public String[] getObjects() {
         return objects;
     }
 
-    public void setObjects(Classification[] objects) {
+    public void setObjects(String[] objects) {
         this.objects = objects;
     }
 

@@ -1,17 +1,15 @@
 package JeeGrp5.mediatech.web.v1.controllers;
 
 import JeeGrp5.mediatech.entities.Image;
+import JeeGrp5.mediatech.models.ImageFormat;
 import JeeGrp5.mediatech.repositories.ImageRepository;
 import JeeGrp5.mediatech.services.image.ImageService;
 import JeeGrp5.mediatech.web.v1.dtos.ImageUploadDto;
-import ai.djl.modality.Classifications;
 import ai.djl.modality.Classifications.Classification;
-import jdk.jfr.ContentType;
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -22,17 +20,14 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Controller
-@RequestMapping("images")
+@RequestMapping(path = "images")
 public class ImageController {
     private final static Logger log = LoggerFactory.getLogger(ImageController.class);
     private final ImageRepository imageRepository;
@@ -62,22 +57,39 @@ public class ImageController {
      */
     @GetMapping(value = "/{id}")
     @ResponseBody
-    public ResponseEntity<byte[]> getOne(@PathVariable String id) {
+    public ResponseEntity<?> download(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "HD") String format) {
         Optional<Image> optionalImage = this.imageRepository.findById(id);
+        ImageFormat imageFormat;
+        try {
+            imageFormat = ImageFormat.valueOf(format);
+        } catch (IllegalArgumentException illegalArgumentException) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+        }
 
         if (optionalImage.isEmpty()) {
             return ResponseEntity.notFound().build();
         }
 
         Image image = optionalImage.get();
-        String imagePath = image.getUrls().get("hd");
         try {
-            URL hdImageUrl = new URL(imagePath);
-            URLConnection urlConnection = hdImageUrl.openConnection();
-            return ResponseEntity
-                    .ok()
-                    .contentType(MediaType.valueOf(urlConnection.getContentType()))
-                    .body(StreamUtils.copyToByteArray(hdImageUrl.openStream()));
+            // Download all formats
+            if (imageFormat == ImageFormat.ALL) {
+                return ResponseEntity
+                        .ok()
+                        .header("Content-Type", "application/zip")
+                        .body(this.imageService.downloadAllFormatInZip(image));
+            } else {
+                // Download a specific format
+                String imagePath = image.getUrls().get(imageFormat.name().toLowerCase(Locale.ROOT));
+                URL imageUrl = new URL(imagePath);
+                URLConnection urlConnection = imageUrl.openConnection();
+                return ResponseEntity
+                        .ok()
+                        .contentType(MediaType.valueOf(urlConnection.getContentType()))
+                        .body(StreamUtils.copyToByteArray(imageUrl.openStream()));
+            }
         } catch (IOException e) {
             e.printStackTrace();
             log.error(e.getMessage());
@@ -114,11 +126,18 @@ public class ImageController {
 
         try {
             FileUtils.copyInputStreamToFile(sourceImage.getInputStream(), file);
-            Classifications classifications = this.imageService.detectObjects(file.getAbsolutePath());
+            Classification[] classifications = this.imageService
+                    .detectObjects(file.getAbsolutePath())
+                    .items()
+                    .toArray(new Classification[0]);
+            String[] items = Arrays.stream(classifications)
+                    .map(Classification::getClassName)
+                    .toArray(String[]::new);
+            image.setObjects(items);
             this.imageService.addWatermark(file.getAbsolutePath());
 
             imageRepository.save(image);
-            return new ImageUploadDto(classifications.items().toArray(new Classification[0]), image.getId());
+            return new ImageUploadDto(items, image.getId());
         } catch (Exception e) {
             imageRepository.delete(image);
 
