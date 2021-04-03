@@ -1,9 +1,11 @@
 package JeeGrp5.mediatech.web.v1.controllers;
 
 import JeeGrp5.mediatech.entities.Image;
+import JeeGrp5.mediatech.exceptions.ImageNotFoundException;
 import JeeGrp5.mediatech.models.ImageFormat;
 import JeeGrp5.mediatech.repositories.ImageRepository;
 import JeeGrp5.mediatech.services.image.ImageService;
+import JeeGrp5.mediatech.web.v1.dtos.ImagePatchDto;
 import JeeGrp5.mediatech.web.v1.dtos.ImageUploadDto;
 import ai.djl.modality.Classifications.Classification;
 import org.apache.commons.io.FileUtils;
@@ -19,8 +21,12 @@ import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.websocket.server.PathParam;
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.file.Path;
@@ -144,6 +150,28 @@ public class ImageController {
             String messageError = "Une exception à eu lieu lors d'une validation d'une image";
             log.error("Error cause: " + e);
             throw new Error(messageError);
+        }
+    }
+
+    /**
+     * Edit an image
+     *
+     * @param id The image to edit
+     * @return The edited image
+     */
+    @PatchMapping("/{id}")
+    @ResponseBody
+    public ResponseEntity<Image> upload(@PathVariable("id") String id, @RequestBody ImagePatchDto imagePatchDto) {
+        try {
+            Image image = this.imageRepository.findById(id).orElseThrow(ImageNotFoundException::new);
+            PropertyDescriptor propertyDescriptor = new PropertyDescriptor(imagePatchDto.getKey(), Image.class);
+            propertyDescriptor.getWriteMethod().invoke(image, imagePatchDto.getValue());
+            return ResponseEntity.ok(this.imageRepository.save(image));
+        } catch (ImageNotFoundException imageNotFoundException) {
+            return ResponseEntity.notFound().build();
+        } catch (IntrospectionException | IllegalAccessException | InvocationTargetException exception) {
+            log.error(exception.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 }
