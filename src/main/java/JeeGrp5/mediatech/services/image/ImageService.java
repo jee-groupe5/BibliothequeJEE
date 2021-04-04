@@ -1,6 +1,7 @@
 package JeeGrp5.mediatech.services.image;
 
 import JeeGrp5.mediatech.entities.Image;
+import JeeGrp5.mediatech.models.ImageFormat;
 import ai.djl.ModelException;
 import ai.djl.modality.Classifications;
 import ai.djl.translate.TranslateException;
@@ -11,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.awt.*;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.net.URL;
 import java.net.URLConnection;
@@ -53,22 +56,47 @@ public class ImageService {
     }
 
     /**
+     * Downscale an image into multiple sub-formats
+     *
+     * @param imagePath path of the image to downscale
+     */
+    public BufferedImage downscale(BufferedImage imageToDownscale, ImageFormat imageFormat) throws IOException {
+        BufferedImage resultImage = new BufferedImage(
+                imageFormat.getWidth(),
+                imageFormat.getHeight(),
+                BufferedImage.TYPE_INT_RGB
+        );
+
+        Graphics2D graphics2D = resultImage.createGraphics();
+        graphics2D.drawImage(
+                imageToDownscale,
+                0, 0,
+                imageFormat.getWidth(),
+                imageFormat.getHeight(),
+                null
+        );
+        graphics2D.dispose();
+
+        return resultImage;
+    }
+
+    /**
      * Return a list of objects and their probabilities from an image
      *
-     * @param imagePath The image path
+     * @param inputStream The image input stream
      * @return A list of objects (name + probability)
      */
-    public Classifications detectObjects(String imagePath) throws ModelException, TranslateException, IOException {
-        return objectDetector.detectObjects(imagePath, threshold);
+    public Classifications detectObjects(InputStream inputStream) throws ModelException, TranslateException, IOException {
+        return objectDetector.detectObjects(inputStream, threshold);
     }
 
     /**
      * Add a watermark to an image
      *
-     * @param imagePath The path to image
+     * @param bufferedImage The buffered image
      * @throws IOException Thrown when image is not found
      */
-    public void addWatermark(String imagePath) throws IOException {
-        this.imageWatermark.addWatermarkToImage(watermarkPath, imagePath);
+    public BufferedImage addWatermark(BufferedImage bufferedImage) throws IOException {
+        return this.imageWatermark.addWatermarkToImage(watermarkPath, bufferedImage);
     }
 }

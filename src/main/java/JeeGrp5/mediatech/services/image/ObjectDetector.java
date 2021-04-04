@@ -3,7 +3,6 @@ package JeeGrp5.mediatech.services.image;
 import ai.djl.Application;
 import ai.djl.Model;
 import ai.djl.ModelException;
-import ai.djl.engine.Engine;
 import ai.djl.inference.Predictor;
 import ai.djl.modality.Classifications;
 import ai.djl.modality.cv.util.NDImageUtils;
@@ -26,14 +25,11 @@ import org.slf4j.LoggerFactory;
 
 import ai.djl.modality.cv.Image;
 import ai.djl.modality.cv.ImageFactory;
-import org.springframework.beans.factory.annotation.Value;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -43,9 +39,8 @@ public class ObjectDetector {
     public ObjectDetector() {
     }
 
-    public Classifications detectObjects(String path, float threshold) throws IOException, ModelException, TranslateException {
-        Path imageFile = Paths.get(path);
-        Image img = ImageFactory.getInstance().fromFile(imageFile);
+    public Classifications detectObjects(InputStream inputStream, float threshold) throws IOException, ModelException, TranslateException {
+        Image img = ImageFactory.getInstance().fromInputStream(inputStream);
 
         String modelUrl =
                 "http://download.tensorflow.org/models/object_detection/tf2/20200711/ssd_mobilenet_v2_320x320_coco17_tpu-8.tar.gz";

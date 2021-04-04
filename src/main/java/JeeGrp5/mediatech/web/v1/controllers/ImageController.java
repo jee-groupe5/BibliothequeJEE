@@ -8,7 +8,7 @@ import JeeGrp5.mediatech.services.image.ImageService;
 import JeeGrp5.mediatech.web.v1.dtos.ImagePatchDto;
 import JeeGrp5.mediatech.web.v1.dtos.ImageUploadDto;
 import ai.djl.modality.Classifications.Classification;
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,15 +21,16 @@ import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.websocket.server.PathParam;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.beans.IntrospectionException;
 import java.beans.PropertyDescriptor;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.file.Path;
 import java.util.*;
 
 @Controller
@@ -67,12 +68,6 @@ public class ImageController {
             @PathVariable String id,
             @RequestParam(defaultValue = "HD") String format) {
         Optional<Image> optionalImage = this.imageRepository.findById(id);
-        ImageFormat imageFormat;
-        try {
-            imageFormat = ImageFormat.valueOf(format);
-        } catch (IllegalArgumentException illegalArgumentException) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-        }
 
         if (optionalImage.isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -81,13 +76,14 @@ public class ImageController {
         Image image = optionalImage.get();
         try {
             // Download all formats
-            if (imageFormat == ImageFormat.ALL) {
+            if ("ALL".equals(format)) {
                 return ResponseEntity
                         .ok()
                         .header("Content-Type", "application/zip")
                         .body(this.imageService.downloadAllFormatInZip(image));
             } else {
                 // Download a specific format
+                ImageFormat imageFormat = ImageFormat.valueOf(format);
                 String imagePath = image.getUrls().get(imageFormat.name().toLowerCase(Locale.ROOT));
                 URL imageUrl = new URL(imagePath);
                 URLConnection urlConnection = imageUrl.openConnection();
@@ -96,6 +92,8 @@ public class ImageController {
                         .contentType(MediaType.valueOf(urlConnection.getContentType()))
                         .body(StreamUtils.copyToByteArray(imageUrl.openStream()));
             }
+        } catch (IllegalArgumentException illegalArgumentException) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (IOException e) {
             e.printStackTrace();
             log.error(e.getMessage());
@@ -112,44 +110,52 @@ public class ImageController {
      */
     @PostMapping("/")
     @ResponseBody
-    public ImageUploadDto upload(@RequestParam("file") MultipartFile sourceImage) {
+    public ResponseEntity<ImageUploadDto> upload(@RequestParam("file") MultipartFile sourceImage) {
         Image image = new Image();
 
         // Generate an id
         imageRepository.save(image);
 
-        String hdPath = Path.of(
-                folderPath + "/" +
-                        image.getId() + "/" +
-                        sourceImage.getOriginalFilename()
-        ).toString();
+        String imageFolderPath = folderPath + "/" + image.getId() + "/";
+        String imageName = FilenameUtils.getBaseName(sourceImage.getOriginalFilename());
+        String imageExtension = FilenameUtils.getExtension(sourceImage.getOriginalFilename());
 
-        HashMap<String, String> hashMap = new HashMap<>();
-        hashMap.put("hd", "file:///" + hdPath);
-        image.setUrls(hashMap);
-
-        File file = new File(hdPath);
-
-        try {
-            FileUtils.copyInputStreamToFile(sourceImage.getInputStream(), file);
+        try (InputStream originalImageInputStream = sourceImage.getInputStream()) {
+            // Find objects in image
             Classification[] classifications = this.imageService
-                    .detectObjects(file.getAbsolutePath())
+                    .detectObjects(originalImageInputStream)
                     .items()
                     .toArray(new Classification[0]);
             String[] items = Arrays.stream(classifications)
                     .map(Classification::getClassName)
                     .toArray(String[]::new);
             image.setObjects(items);
-            this.imageService.addWatermark(file.getAbsolutePath());
 
+            // Add watermark
+            BufferedImage originalBufferedImage = ImageIO.read(sourceImage.getInputStream());
+            originalBufferedImage = this.imageService.addWatermark(originalBufferedImage);
+
+            // Downscale image
+            HashMap<String, String> hashMap = new HashMap<>();
+            if (!new File(imageFolderPath).mkdir()) {
+                throw new Exception("Couldn't create directory @ " + imageFolderPath);
+            }
+            for (ImageFormat imageFormat : ImageFormat.values()) {
+                BufferedImage scaledImage = this.imageService.downscale(originalBufferedImage, imageFormat);
+                String formatImageName = imageName + "_" + imageFormat.name().toLowerCase(Locale.ROOT);
+                String imagePath = imageFolderPath + formatImageName + "." + imageExtension;
+                File imageFile = new File(imagePath);
+                ImageIO.write(scaledImage, "png", imageFile);
+                hashMap.put(imageFormat.name().toLowerCase(Locale.ROOT), "file:///" + imagePath);
+            }
+
+            image.setUrls(hashMap);
             imageRepository.save(image);
-            return new ImageUploadDto(items, image.getId());
+            return ResponseEntity.ok(new ImageUploadDto(items, image.getId()));
         } catch (Exception e) {
             imageRepository.delete(image);
-
-            String messageError = "Une exception à eu lieu lors d'une validation d'une image";
-            log.error("Error cause: " + e);
-            throw new Error(messageError);
+            log.error("Error cause: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
