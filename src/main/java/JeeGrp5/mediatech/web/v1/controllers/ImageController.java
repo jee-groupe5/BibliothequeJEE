@@ -108,7 +108,7 @@ public class ImageController {
      * @return Metadata, containing the presence (or not) of persons, objects (with probability) and all dimensions
      * of the image formats
      */
-    @PostMapping("/")
+    @PostMapping
     @ResponseBody
     public ResponseEntity<ImageUploadDto> upload(@RequestParam("file") MultipartFile sourceImage) {
         Image image = new Image();
