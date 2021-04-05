@@ -16,12 +16,21 @@ public class Image implements Serializable {
     private String category;
     private String name;
     private Person[] persons;
+    private String[] objects;
     private boolean published;
     private String description;
     private String[] tags;
     private Map<String, String> urls;
 
     public Image() {
+    }
+
+    public String[] getObjects() {
+        return objects;
+    }
+
+    public void setObjects(String[] objects) {
+        this.objects = objects;
     }
 
     public String getCategory() {
@@ -92,11 +101,14 @@ public class Image implements Serializable {
     public String toString() {
         return "Image{" +
                 "id='" + id + '\'' +
+                ", category='" + category + '\'' +
                 ", name='" + name + '\'' +
-                ", description='" + description + '\'' +
-                ", urls=" + urls +
-                ", tags=" + Arrays.toString(tags) +
+                ", persons=" + Arrays.toString(persons) +
+                ", objects=" + objects +
                 ", published=" + published +
+                ", description='" + description + '\'' +
+                ", tags=" + Arrays.toString(tags) +
+                ", urls=" + urls +
                 '}';
     }
 }

@@ -1,29 +1,23 @@
 package JeeGrp5.mediatech.services.image;
 
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
+import java.net.URL;
 
 public class ImageWatermark {
 
     public ImageWatermark() {
     }
 
-    public void addWatermarkToImage(String watermarkPath, String imagePath) throws IOException {
-        BufferedImage watermark = ImageIO.read(Paths.get(watermarkPath).toFile());
+    public BufferedImage addWatermarkToImage(String watermarkPath, BufferedImage originalBufferedImage) throws IOException {
+        BufferedImage watermark = ImageIO.read(new URL(watermarkPath).openStream());
 
-        File imageFile = Paths.get(imagePath).toFile();
-        BufferedImage image = ImageIO.read(imageFile);
-
-        Graphics g = image.getGraphics();
+        Graphics g = originalBufferedImage.getGraphics();
         g.drawImage(watermark, 10, 0, null);
+        g.dispose();
 
-        ImageIO.write(image, "png", new File(imagePath));
+        return originalBufferedImage;
     }
 }

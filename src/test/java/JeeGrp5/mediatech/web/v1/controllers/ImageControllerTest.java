@@ -1,56 +1,43 @@
 package JeeGrp5.mediatech.web.v1.controllers;
 
-import JeeGrp5.mediatech.web.v1.dtos.UserGetDto;
-import JeeGrp5.mediatech.web.v1.dtos.UserLoginDto;
+import JeeGrp5.mediatech.web.v1.dtos.ImageUploadDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
-import javax.servlet.http.Cookie;
-
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class ImageControllerTest {
-
     @Autowired
-    private static MockMvc mockMvc;
-    private static Cookie[] cookies;
-
-    @BeforeAll
-    public static void login() throws Exception {
-        ObjectMapper objectMapper = new ObjectMapper();
-        UserLoginDto userCredentials = new UserLoginDto("oualid.hassan.pro@gmail.com", "123456");
-        cookies = mockMvc.perform(
-                post("/users/login")
-                        .contentType("application/json")
-                        .content(objectMapper.writeValueAsString(userCredentials)))
-                .andReturn().getResponse().getCookies();
-    }
+    private MockMvc mockMvc;
+    private String addedImageId;
 
     @Test
-    public void shouldCreateImage() throws Exception {
+    public void shouldDownscaleImage() throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
-        UserGetDto userGetDto = new UserGetDto(
-                "Oualid",
-                "Hassan",
-                "oualid.hassan.pro@gmail.com",
-                "Gestionnaire"
+        MockMultipartFile mockMultipartFile = new MockMultipartFile(
+                "file",
+                getClass().getClassLoader().getResource("test_car.jfif").openStream()
         );
 
-        mockMvc.perform(
-                get("/users/information")
-                        .cookie(cookies))
+        ImageUploadDto imageUploadDto = objectMapper.
+                readValue(mockMvc.perform(multipart("/images").file(mockMultipartFile))
+                .andDo(print())
+                .andReturn().getResponse().getContentAsByteArray(), ImageUploadDto.class);
+        addedImageId = imageUploadDto.getId();
+
+        mockMvc.perform(get("/images/" + addedImageId + "?format=DVD"))
+                .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(content().json(objectMapper.writeValueAsString(userGetDto)));
+                .andReturn().getResponse();
     }
 }

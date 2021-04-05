@@ -1,17 +1,17 @@
 package JeeGrp5.mediatech.web.v1.controllers;
 
 import JeeGrp5.mediatech.entities.Image;
+import JeeGrp5.mediatech.exceptions.ImageNotFoundException;
+import JeeGrp5.mediatech.models.ImageFormat;
 import JeeGrp5.mediatech.repositories.ImageRepository;
 import JeeGrp5.mediatech.services.image.ImageService;
+import JeeGrp5.mediatech.web.v1.dtos.ImagePatchDto;
 import JeeGrp5.mediatech.web.v1.dtos.ImageUploadDto;
-import ai.djl.modality.Classifications;
 import ai.djl.modality.Classifications.Classification;
-import jdk.jfr.ContentType;
-import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,18 +21,20 @@ import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.beans.IntrospectionException;
+import java.beans.PropertyDescriptor;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLConnection;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 @Controller
-@RequestMapping("images")
+@RequestMapping(path = "images")
 public class ImageController {
     private final static Logger log = LoggerFactory.getLogger(ImageController.class);
     private final ImageRepository imageRepository;
@@ -62,7 +64,9 @@ public class ImageController {
      */
     @GetMapping(value = "/{id}")
     @ResponseBody
-    public ResponseEntity<byte[]> getOne(@PathVariable String id) {
+    public ResponseEntity<?> download(
+            @PathVariable String id,
+            @RequestParam(defaultValue = "HD") String format) {
         Optional<Image> optionalImage = this.imageRepository.findById(id);
 
         if (optionalImage.isEmpty()) {
@@ -70,14 +74,26 @@ public class ImageController {
         }
 
         Image image = optionalImage.get();
-        String imagePath = image.getUrls().get("hd");
         try {
-            URL hdImageUrl = new URL(imagePath);
-            URLConnection urlConnection = hdImageUrl.openConnection();
-            return ResponseEntity
-                    .ok()
-                    .contentType(MediaType.valueOf(urlConnection.getContentType()))
-                    .body(StreamUtils.copyToByteArray(hdImageUrl.openStream()));
+            // Download all formats
+            if ("ALL".equals(format)) {
+                return ResponseEntity
+                        .ok()
+                        .header("Content-Type", "application/zip")
+                        .body(this.imageService.downloadAllFormatInZip(image));
+            } else {
+                // Download a specific format
+                ImageFormat imageFormat = ImageFormat.valueOf(format);
+                String imagePath = image.getUrls().get(imageFormat.name().toLowerCase(Locale.ROOT));
+                URL imageUrl = new URL(imagePath);
+                URLConnection urlConnection = imageUrl.openConnection();
+                return ResponseEntity
+                        .ok()
+                        .contentType(MediaType.valueOf(urlConnection.getContentType()))
+                        .body(StreamUtils.copyToByteArray(imageUrl.openStream()));
+            }
+        } catch (IllegalArgumentException illegalArgumentException) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (IOException e) {
             e.printStackTrace();
             log.error(e.getMessage());
@@ -92,39 +108,74 @@ public class ImageController {
      * @return Metadata, containing the presence (or not) of persons, objects (with probability) and all dimensions
      * of the image formats
      */
-    @PostMapping("/")
+    @PostMapping
     @ResponseBody
-    public ImageUploadDto upload(@RequestParam("file") MultipartFile sourceImage) {
+    public ResponseEntity<ImageUploadDto> upload(@RequestParam("file") MultipartFile sourceImage) {
         Image image = new Image();
 
         // Generate an id
         imageRepository.save(image);
 
-        String hdPath = Path.of(
-                folderPath + "/" +
-                        image.getId() + "/" +
-                        sourceImage.getOriginalFilename()
-        ).toString();
+        String imageFolderPath = folderPath + "/" + image.getId() + "/";
+        String imageExtension = FilenameUtils.getExtension(sourceImage.getOriginalFilename());
 
-        HashMap<String, String> hashMap = new HashMap<>();
-        hashMap.put("hd", "file:///" + hdPath);
-        image.setUrls(hashMap);
+        try (InputStream originalImageInputStream = sourceImage.getInputStream()) {
+            // Find objects in image
+            Classification[] classifications = this.imageService
+                    .detectObjects(originalImageInputStream)
+                    .items()
+                    .toArray(new Classification[0]);
+            String[] items = Arrays.stream(classifications)
+                    .map(Classification::getClassName)
+                    .toArray(String[]::new);
+            image.setObjects(items);
 
-        File file = new File(hdPath);
+            // Add watermark
+            BufferedImage originalBufferedImage = ImageIO.read(sourceImage.getInputStream());
+            originalBufferedImage = this.imageService.addWatermark(originalBufferedImage);
 
-        try {
-            FileUtils.copyInputStreamToFile(sourceImage.getInputStream(), file);
-            Classifications classifications = this.imageService.detectObjects(file.getAbsolutePath());
-            this.imageService.addWatermark(file.getAbsolutePath());
+            // Downscale image
+            HashMap<String, String> hashMap = new HashMap<>();
+            if (!new File(imageFolderPath).mkdir()) {
+                throw new Exception("Couldn't create directory @ " + imageFolderPath);
+            }
+            for (ImageFormat imageFormat : ImageFormat.values()) {
+                BufferedImage scaledImage = this.imageService.downscale(originalBufferedImage, imageFormat);
+                String formatImageName = imageFormat.name().toLowerCase(Locale.ROOT) + ".png";
+                String imagePath = imageFolderPath + formatImageName + "." + imageExtension;
+                ImageIO.write(scaledImage, "png", new File(imagePath));
+                hashMap.put(imageFormat.name().toLowerCase(Locale.ROOT), "file:" + imagePath);
+            }
 
+            image.setUrls(hashMap);
             imageRepository.save(image);
-            return new ImageUploadDto(classifications.items().toArray(new Classification[0]), image.getId());
+            return ResponseEntity.ok(new ImageUploadDto(items, image.getId()));
         } catch (Exception e) {
             imageRepository.delete(image);
+            log.error("Error cause: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
-            String messageError = "Une exception à eu lieu lors d'une validation d'une image";
-            log.error("Error cause: " + e);
-            throw new Error(messageError);
+    /**
+     * Edit an image
+     *
+     * @param id The image to edit
+     * @return The edited image
+     */
+    @PatchMapping("/{id}")
+    @ResponseBody
+    public ResponseEntity<Image> upload(@PathVariable("id") String id, @RequestBody ImagePatchDto imagePatchDto) {
+        try {
+            Image image = this.imageRepository.findById(id).orElseThrow(ImageNotFoundException::new);
+            PropertyDescriptor propertyDescriptor = new PropertyDescriptor(imagePatchDto.getKey(), Image.class);
+            propertyDescriptor.getWriteMethod().invoke(image, imagePatchDto.getValue());
+            return ResponseEntity.ok(this.imageRepository.save(image));
+        } catch (ImageNotFoundException imageNotFoundException) {
+            return ResponseEntity.notFound().build();
+        } catch (IntrospectionException | IllegalAccessException | InvocationTargetException exception) {
+            log.error(exception.getMessage());
+            return ResponseEntity.badRequest().build();
         }
     }
 }
