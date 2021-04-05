@@ -4,7 +4,7 @@ import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.nio.file.Paths;
+import java.net.URL;
 
 public class ImageWatermark {
 
@@ -12,7 +12,7 @@ public class ImageWatermark {
     }
 
     public BufferedImage addWatermarkToImage(String watermarkPath, BufferedImage originalBufferedImage) throws IOException {
-        BufferedImage watermark = ImageIO.read(Paths.get(watermarkPath).toFile());
+        BufferedImage watermark = ImageIO.read(new URL(watermarkPath).openStream());
 
         Graphics g = originalBufferedImage.getGraphics();
         g.drawImage(watermark, 10, 0, null);

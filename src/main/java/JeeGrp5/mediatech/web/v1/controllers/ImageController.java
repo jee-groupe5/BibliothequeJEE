@@ -117,7 +117,6 @@ public class ImageController {
         imageRepository.save(image);
 
         String imageFolderPath = folderPath + "/" + image.getId() + "/";
-        String imageName = FilenameUtils.getBaseName(sourceImage.getOriginalFilename());
         String imageExtension = FilenameUtils.getExtension(sourceImage.getOriginalFilename());
 
         try (InputStream originalImageInputStream = sourceImage.getInputStream()) {
@@ -142,11 +141,10 @@ public class ImageController {
             }
             for (ImageFormat imageFormat : ImageFormat.values()) {
                 BufferedImage scaledImage = this.imageService.downscale(originalBufferedImage, imageFormat);
-                String formatImageName = imageName + "_" + imageFormat.name().toLowerCase(Locale.ROOT);
+                String formatImageName = imageFormat.name().toLowerCase(Locale.ROOT) + ".png";
                 String imagePath = imageFolderPath + formatImageName + "." + imageExtension;
-                File imageFile = new File(imagePath);
-                ImageIO.write(scaledImage, "png", imageFile);
-                hashMap.put(imageFormat.name().toLowerCase(Locale.ROOT), "file:///" + imagePath);
+                ImageIO.write(scaledImage, "png", new File(imagePath));
+                hashMap.put(imageFormat.name().toLowerCase(Locale.ROOT), "file:" + imagePath);
             }
 
             image.setUrls(hashMap);
