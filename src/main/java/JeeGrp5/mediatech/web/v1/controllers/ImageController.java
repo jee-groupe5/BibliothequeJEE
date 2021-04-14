@@ -8,6 +8,7 @@ import JeeGrp5.mediatech.services.image.ImageService;
 import JeeGrp5.mediatech.web.v1.dtos.ImagePatchDto;
 import JeeGrp5.mediatech.web.v1.dtos.ImageUploadDto;
 import ai.djl.modality.Classifications.Classification;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,6 +177,26 @@ public class ImageController {
         } catch (IntrospectionException | IllegalAccessException | InvocationTargetException exception) {
             log.error(exception.getMessage());
             return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
+     * Delete an image
+     */
+    @DeleteMapping("/{id}")
+    @ResponseBody
+    public ResponseEntity<Image> delete(@PathVariable("id") String id) {
+        try {
+            Image image = this.imageRepository.findById(id).orElseThrow(ImageNotFoundException::new);
+            String directory = folderPath + "/" + image.getId();
+            FileUtils.deleteDirectory(new File(directory));
+            image.setArchived(true);
+            return ResponseEntity.ok(this.imageRepository.save(image));
+        } catch (ImageNotFoundException imageNotFoundException) {
+            return ResponseEntity.notFound().build();
+        } catch (IOException e) {
+            log.error(e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

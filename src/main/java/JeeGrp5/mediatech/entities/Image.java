@@ -21,8 +21,17 @@ public class Image implements Serializable {
     private String description;
     private String[] tags;
     private Map<String, String> urls;
+    private boolean archived;
 
     public Image() {
+    }
+
+    public boolean isArchived() {
+        return archived;
+    }
+
+    public void setArchived(boolean archived) {
+        this.archived = archived;
     }
 
     public String[] getObjects() {
@@ -104,11 +113,12 @@ public class Image implements Serializable {
                 ", category='" + category + '\'' +
                 ", name='" + name + '\'' +
                 ", persons=" + Arrays.toString(persons) +
-                ", objects=" + objects +
+                ", objects=" + Arrays.toString(objects) +
                 ", published=" + published +
                 ", description='" + description + '\'' +
                 ", tags=" + Arrays.toString(tags) +
                 ", urls=" + urls +
+                ", archived=" + archived +
                 '}';
     }
 }
